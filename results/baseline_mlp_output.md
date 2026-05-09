@@ -21,11 +21,11 @@ epoch 14/15  loss=0.280  val_acc=0.712  val_F1=0.694  val_AUC=0.807  *
 epoch 15/15  loss=0.252  val_acc=0.750  val_F1=0.764  val_AUC=0.806
 best val AUC=0.807 at epoch 14
 
-[train] n=361  acc=0.972  P(hacked)=0.973  R(hacked)=0.973  F1(hacked)=0.973  AUC=0.998
+[train] n=361  acc=0.972  P(hacked)=0.973  R(hacked)=0.973  F1(hacked)=0.973  AUC=0.998  AUPRC=0.998
         TN=169  FP=5  FN=5  TP=182
-[val] n=52  acc=0.712  P(hacked)=0.773  R(hacked)=0.630  F1(hacked)=0.694  AUC=0.807
+[val] n=52  acc=0.712  P(hacked)=0.773  R(hacked)=0.630  F1(hacked)=0.694  AUC=0.807  AUPRC=0.846
         TN=20  FP=5  FN=10  TP=17
-[test] n=104  acc=0.760  P(hacked)=0.754  R(hacked)=0.796  F1(hacked)=0.775  AUC=0.834
+[test] n=104  acc=0.760  P(hacked)=0.754  R(hacked)=0.796  F1(hacked)=0.775  AUC=0.834  AUPRC=0.872
         TN=36  FP=14  FN=11  TP=43
 
 Top 15 features pulling toward HACKED (linearized influence):

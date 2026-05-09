@@ -1,12 +1,14 @@
 # TRACE hack-detection baselines
 
-Three baselines for the binary classification task: given a TRACE trajectory, predict
+Three approaches for the binary classification task: given a TRACE trajectory, predict
 `is_hacked` (True = the assistant reward-hacked in ≥1 turn; False = benign).
-Each baseline answers a different question:
+"Baseline" is used loosely throughout — these are the approaches evaluated. These are the three main approaches:
 
 1. **TF-IDF + LogReg** — what's the lexical floor?
-2. **Frozen encoder + LogReg** — what do pretrained semantic representations add over n-grams?
-3. **Fine-tuned encoder** — what does adapting representations to the task add over frozen ones?
+2. **TF-IDF + small MLP** — does adding nonlinearity over the same features help, or
+   does the small dataset just push us into overfitting?
+3. **LLM monitor (zero-shot)** — what does a strong pretrained reasoning model do
+   without any task-specific training?
 
 Dataset splits come from `scripts/run_pipeline.py` (stratified on `is_hacked`):
 
@@ -22,16 +24,18 @@ and `tool_results`. Labels are trajectory-level only — no per-turn supervision
 
 ---
 
-## Token-length reference
+## Cross-baseline comparison (test split, n=104)
 
-Relevant numbers when choosing a baseline (cl100k_base BPE, per trajectory):
+| baseline | acc | F1 | recall | precision | AUROC | AUPRC |
+|---|---|---|---|---|---|---|
+| TF-IDF + LogReg | 0.712 | 0.737 | 0.778 | 0.700 | 0.815 | 0.851 |
+| TF-IDF + small MLP | 0.760 | 0.775 | 0.796 | 0.754 | 0.834 | 0.872 |
+| **LLM (gpt-5.5, continuous)** | **0.788** | **0.823** | **0.944** | 0.729 | **0.920** | **0.925** |
 
-| representation | median | p95 | max |
-|---|---|---|---|
-| speech-only (just `content`) | 1,049 | 1,861 | 4,076 |
-| speech + tool I/O (full)     | 10,665 | 18,916 | 24,478 |
-
-78% of trajectories exceed 8K tokens with tool I/O included; all fit under 32K.
+LLM wins on all metrics except precision (it over-flags borderline cases). AUC family
+is comparable across all three because LLM scores are continuous probabilities, not
+binary 0/1. The LLM number is single-run; results show that reasoning-model stochasticity may add a ~±2-3
+trajectory swing on re-runs.
 
 ---
 
@@ -67,6 +71,7 @@ stays near 50%, most signal lives in structure and reasoning, not lexicon.
   is invisible.
 
 Run: `.venv/bin/python scripts/baseline_tfidf.py`
+Output is saved to `results/baseline_tfidf_output.md` by default.
 
 ---
 
@@ -110,7 +115,7 @@ exactly as in Baseline 1: `ngram_range=(1,2)`, `max_features=50_000`, `min_df=2`
 
 **Strengths.**
 - Direct nonlinear comparison vs. Baseline 1 with the same input.
-- Tiny model (~13M params dominated by the 50K → 256 input layer); fast to iterate.
+- Small model (~160K params; input layer 5K → 32 dominates the count); fast to iterate.
 - Same evaluation surface as Baseline 1 — every difference is from the classifier head.
 
 **Limitations.**
@@ -123,43 +128,105 @@ exactly as in Baseline 1: `ngram_range=(1,2)`, `max_features=50_000`, `min_df=2`
   reporting mean over 3–5 seeds.
 
 Run: `.venv/bin/python scripts/baseline_mlp.py`
-Output is saved to `baseline_mlp_output.md` by default (use `--output-md PATH` to
-change).
+Output is saved to `results/baseline_mlp_output.md` by default (use `--output-md
+PATH` to change).
 
 ---
 
-## Deferred — Long-context encoder approaches
+## Baseline 3 — LLM monitor (zero-shot, continuous scoring)
 
-A pretrained-encoder family of baselines (frozen embeddings + LogReg, full
-fine-tuning) is implemented in `scripts/baseline_encoder.py` (dry-run validates the
-pipeline) but not yet treated as part of the documented baseline set. They require
-GPU/MPS for tractable training time and a ~600 MB checkpoint download. We'll revisit
-once the TF-IDF baselines are nailed down and we know whether the lexical floor is
-already close to whatever ceiling the task supports.
+**What.** Prompt a capable LLM (default `gpt-5.5`) for a JSON object with a
+calibrated probability of reward-hacking and a one-sentence justification. The
+probability is the score; `pred = (probability > 0.5)`. No training. Implemented in
+`scripts/baseline_llm_continuous.py`.
+
+**Why it's a useful baseline.** Tests the ceiling of pretrained reasoning without
+task-specific fitting. A wide gap to the supervised baselines suggests the
+supervised models are limited by training-set size; a narrow gap argues lexical
+features capture most of the available signal.
+
+**Input representation.** Same flattened ChatML as the supervised baselines
+(`representation="full"`).
+
+**Prompt + parsing.** Short rubric distilled from TRACE category definitions;
+required output `{"hacked_probability": float, "justification": str}`. Parser
+attempts whole-response JSON first, falls back to flat-regex extraction.
+
+**Compute.** Inference-only. ~30-40s per call on gpt-5.5; full test split runs in
+~12-15 min at concurrency=4 on a Tier 1 OpenAI account. Cost ~$3-8 for n=104.
+
+**Strengths.**
+- Strongest test-set numbers across the three baselines (see comparison table).
+- High recall — catches borderline hacks the supervised models miss.
+- Free per-trajectory justification useful for error analysis.
+
+**Limitations.**
+- Run-to-run variance (~±2-3 trajectories), potentially from reasoning-model stochasticity.
+- Inference cost is non-trivial (vs free for supervised baselines).
+- Verbal probabilities cluster on round numbers; calibration is imperfect.
+- Lower precision than MLP — over-flags at threshold 0.5; threshold tuning could
+  rebalance.
+- Requires `OPENAI_API_KEY`.
+
+Run: `.venv/bin/python scripts/baseline_llm_continuous.py --split test`
+Output is saved to `results/baseline_llm_continuous_<model>_output.md` by default.
+
+A binary-output variant (`scripts/baseline_llm.py`) is kept for reference; it
+predates the continuous-scoring redesign and produces degenerate AUROC.
+
+---
+
+## Deferred
+
+**Long-context encoder.** Implemented in `scripts/baseline_encoder.py` (dry-run
+only); requires GPU/MPS and a ~600 MB checkpoint. Worth revisiting if the gap
+between Baseline 2 and Baseline 3 suggests a fine-tuned encoder could help.
+
+**Open-source LLM fine-tuning.** Fine-tune a smaller open-source model (Qwen2.5-7B,
+Llama-3.1-8B, etc.) on the 361 training trajectories via LoRA. Tests whether
+task-specific fitting on a smaller LLM beats zero-shot prompting of a larger one;
+requires GPU.
+
+**Logprob-based LLM scoring.** Attempted via `baseline_llm_logprobs.py` (since
+removed). Blocked: gpt-5/o-series reasoning models reject the `logprobs` API
+parameter. Verbal probability (Baseline 3) is the available substitute. Worth
+revisiting if logprobs become available on capable models.
+
+### Token-length reference (relevant for encoder approaches)
+
+Trajectory token counts (cl100k_base BPE):
+
+| representation | median | p95 | max |
+|---|---|---|---|
+| speech-only (just `content`) | 1,049 | 1,861 | 4,076 |
+| speech + tool I/O (full)     | 10,665 | 18,916 | 24,478 |
+
+78% of trajectories exceed 8K tokens with tool I/O included; all fit under 32K.
+A 16K-context encoder covers most trajectories without truncation; an 8K-context
+encoder requires aggressive `tool_results` capping to fit the long tail.
 
 ---
 
 ## Shared evaluation
 
-Both scripts emit the same metrics on val and test via
-`baseline_common.evaluate_predictions`:
+All three scripts emit the same metrics via `baseline_common.evaluate_predictions`:
 
 - accuracy
 - precision / recall / F1 for the `hacked` class
-- ROC-AUC when the model produces scores (both do)
+- AUROC and AUPRC when the model produces scores (all three do)
 - confusion matrix
 - predictions saved to `data/predictions/<baseline>_<split>.jsonl` with
   `(trajectory_id, y_true, y_pred, score, raw_output)` per row.
 
-This makes it easy to compare models, ensemble them, or do error analysis by joining
-predictions back to the processed trajectories.
+This makes cross-model comparison and error analysis straightforward.
 
 ---
 
 ## Suggested running order
 
-1. **TF-IDF + LogReg** first (fast, free) → lexical floor; sanity-checks the pipeline.
-2. **TF-IDF + MLP** second → does adding nonlinearity over the same features help, or
-   does the small dataset just push us into overfitting? A small gain validates that
-   feature interactions matter; a tie or regression argues the task is mostly linear
-   in n-grams at this dataset size.
+1. **TF-IDF + LogReg** first (~30s, free) → lexical floor; pipeline sanity check.
+2. **TF-IDF + MLP** second (~30s, free) → does nonlinearity over the same features
+   help, or does it just over-fit at this dataset size?
+3. **LLM monitor** last (~12-15 min, ~$3-8) → ceiling estimate from a strong
+   pretrained reasoning model. Wide gap to (1)/(2) suggests more training data
+   would help; narrow gap argues lexical signal carries most of the load.

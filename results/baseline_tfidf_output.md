@@ -1,11 +1,12 @@
 representation=full  ngram=(1,2)
 train n=361  val n=52  test n=104
 vocab size: 50,000
-[train] n=361  acc=0.989  P(hacked)=0.995  R(hacked)=0.984  F1(hacked)=0.989  AUC=1.000
+
+[train] n=361  acc=0.989  P(hacked)=0.995  R(hacked)=0.984  F1(hacked)=0.989  AUC=1.000  AUPRC=1.000
         TN=173  FP=1  FN=3  TP=184
-[val] n=52  acc=0.692  P(hacked)=0.704  R(hacked)=0.704  F1(hacked)=0.704  AUC=0.773
+[val] n=52  acc=0.692  P(hacked)=0.704  R(hacked)=0.704  F1(hacked)=0.704  AUC=0.773  AUPRC=0.826
         TN=17  FP=8  FN=8  TP=19
-[test] n=104  acc=0.712  P(hacked)=0.700  R(hacked)=0.778  F1(hacked)=0.737  AUC=0.815
+[test] n=104  acc=0.712  P(hacked)=0.700  R(hacked)=0.778  F1(hacked)=0.737  AUC=0.815  AUPRC=0.851
         TN=32  FP=18  FN=12  TP=42
 
 Top 15 features pulling toward HACKED:

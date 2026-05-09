@@ -9,6 +9,7 @@ from typing import Literal
 import numpy as np
 from sklearn.metrics import (
     accuracy_score,
+    average_precision_score,
     confusion_matrix,
     precision_recall_fscore_support,
     roc_auc_score,
@@ -77,6 +78,7 @@ class EvalResult:
     recall: float
     f1: float
     roc_auc: float | None
+    auprc: float | None
     tn: int
     fp: int
     fn: int
@@ -85,13 +87,15 @@ class EvalResult:
 
     def format(self) -> str:
         auc = f"{self.roc_auc:.3f}" if self.roc_auc is not None else "  -  "
+        auprc = f"{self.auprc:.3f}" if self.auprc is not None else "  -  "
         return (
             f"[{self.split}] n={self.n}  "
             f"acc={self.accuracy:.3f}  "
             f"P(hacked)={self.precision:.3f}  "
             f"R(hacked)={self.recall:.3f}  "
             f"F1(hacked)={self.f1:.3f}  "
-            f"AUC={auc}\n"
+            f"AUC={auc}  "
+            f"AUPRC={auprc}\n"
             f"        TN={self.tn}  FP={self.fp}  FN={self.fn}  TP={self.tp}"
         )
 
@@ -109,11 +113,17 @@ def evaluate_predictions(
     )
     tn, fp, fn, tp = confusion_matrix(y_true, y_pred, labels=[0, 1]).ravel()
     auc = None
+    auprc = None
     if y_score is not None and len(set(y_true.tolist())) == 2:
+        scores = np.asarray(y_score, dtype=float)
         try:
-            auc = float(roc_auc_score(y_true, np.asarray(y_score, dtype=float)))
+            auc = float(roc_auc_score(y_true, scores))
         except ValueError:
             auc = None
+        try:
+            auprc = float(average_precision_score(y_true, scores))
+        except ValueError:
+            auprc = None
     return EvalResult(
         split=split,
         accuracy=float(accuracy_score(y_true, y_pred)),
@@ -121,6 +131,7 @@ def evaluate_predictions(
         recall=float(r),
         f1=float(f1),
         roc_auc=auc,
+        auprc=auprc,
         tn=int(tn),
         fp=int(fp),
         fn=int(fn),

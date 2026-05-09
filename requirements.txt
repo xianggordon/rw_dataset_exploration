@@ -8,6 +8,7 @@ matplotlib>=3.8
 # Baselines
 scikit-learn>=1.4
 tiktoken>=0.7
+openai>=1.50
 # torch and transformers are heavy (~1GB); install only if you plan to run
 # baseline_encoder.py. Pinned conservative minimums.
 torch>=2.2
