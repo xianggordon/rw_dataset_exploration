@@ -1,5 +1,7 @@
 # TRACE hack-detection baselines
 
+Source Repo: https://github.com/xianggordon/rw_dataset_exploration
+
 Three approaches for the binary classification task: given a TRACE trajectory, predict
 `is_hacked` (True = the assistant reward-hacked in ≥1 turn; False = benign).
 "Baseline" is used loosely throughout — these represent the approaches evaluated and LLMs + AI tools were used in this work: 
