@@ -83,7 +83,7 @@ def main() -> None:
     parser.add_argument(
         "--output-md",
         type=Path,
-        default=REPO_ROOT / "baseline_mlp_output.md",
+        default=REPO_ROOT / "results" / "baseline_mlp_output.md",
         help="markdown file to mirror stdout to",
     )
     args = parser.parse_args()
