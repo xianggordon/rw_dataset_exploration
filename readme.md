@@ -2,7 +2,7 @@
 
 Three approaches for the binary classification task: given a TRACE trajectory, predict
 `is_hacked` (True = the assistant reward-hacked in ≥1 turn; False = benign).
-"Baseline" is used loosely throughout — these are the approaches evaluated. These are the three main approaches:
+"Baseline" is used loosely throughout — these represent the approaches evaluated and LLMs + AI tools were used in this work: 
 
 1. **TF-IDF + LogReg** — what's the lexical floor?
 2. **TF-IDF + small MLP** — does adding nonlinearity over the same features help, or
@@ -26,11 +26,16 @@ and `tool_results`. Labels are trajectory-level only — no per-turn supervision
 
 ## Cross-baseline comparison (test split, n=104)
 
+![Cross-baseline comparison](results/figures/baseline_comparison.png)
+
 | baseline | acc | F1 | recall | precision | AUROC | AUPRC |
 |---|---|---|---|---|---|---|
 | TF-IDF + LogReg | 0.712 | 0.737 | 0.778 | 0.700 | 0.815 | 0.851 |
 | TF-IDF + small MLP | 0.760 | 0.775 | 0.796 | 0.754 | 0.834 | 0.872 |
 | **LLM (gpt-5.5, continuous)** | **0.788** | **0.823** | **0.944** | 0.729 | **0.920** | **0.925** |
+
+Regenerate with `.venv/bin/python scripts/plot_baseline_comparison.py` whenever
+predictions are refreshed.
 
 LLM wins on all metrics except precision (it over-flags borderline cases). AUC family
 is comparable across all three because LLM scores are continuous probabilities, not
